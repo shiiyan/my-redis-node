@@ -30,23 +30,67 @@ app.get('/', (req, res) => {
   `)
 })
 
-// app.post('/', (req, res) => {
-//   let number = req.body.number
+app.post('/', (req, res) => {
+  let number = req.body.number
 
-//   redisClient.exists(number, (error, result) => {
-//     if (result) {
+  redisClient.exists(number, (error, isKeyExistInCache) => {
+    if (error) {
+      console.error(error)
+      return
+    }
 
-//     } else {
+    if (isKeyExistInCache) {
+      getResultFromCache(number, res)
+    } else {
+      getResultFromAPI(number, res)
+    }
+  })
 
-//     }
-//   })
+})
 
-// })
+const getResultFromCache = (number, res) => {
+  redisClient.get(number, (error, result) => {
+    if (error) {
+      console.error(error)
+      return
+    }
 
-// app.get('/done', (req, res) => {
-//   res.send(`
-//   `)
-// })
+    if (!result) {
+      console.error('key is not exist in cache')
+      return
+    }
 
+    res.redirect(`/done?result=${result}&from=cache`)
+  })
+}
 
-app.listen(8080)
+const getResultFromAPI = (number, res) => {
+  axios.post('http://localhost:3000/', {
+    number: number
+  })
+    .then(response => {
+      let result = response.data.result
+      redisClient.set(number, result)
+      redisClient.expire(number, 60)
+
+      res.redirect(`/done?result=${result}&from=API`)
+    })
+}
+
+app.get('/done', (req, res) => {
+  res.send(`
+  <html>
+    <head></head>
+    <body>
+      The Result is: ${req.query.result}
+      <br />
+      So the original value is ${req.query.result / 2}
+      <br />
+      And comes from: ${req.query.from}
+    </body>
+  </html>
+  `)
+})
+
+app.listen(8080, () => console.log('Main server is listening on port 8080...'));
+
