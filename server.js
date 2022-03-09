@@ -7,6 +7,8 @@ const axios = require('axios')
 const app = express()
 const redisClient = redis.createClient('redis://localhost:6379')
 
+redisClient.on('error', (err) => console.log('Redis Client Error', err))
+
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }))
 
@@ -30,8 +32,9 @@ app.get('/', (req, res) => {
   `)
 })
 
-app.post('/', (req, res) => {
+app.post('/', async (req, res) => {
   let number = req.body.number
+  await redisClient.connect()
 
   redisClient.exists(number, (error, isKeyExistInCache) => {
     if (error) {
@@ -45,7 +48,6 @@ app.post('/', (req, res) => {
       getResultFromAPI(number, res)
     }
   })
-
 })
 
 const getResultFromCache = (number, res) => {
