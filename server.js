@@ -1,13 +1,10 @@
-const express = require('express')
+const express = require('express');
 const redis = require('redis')
 const bodyParser = require('body-parser')
 const cors = require('cors')
 const axios = require('axios')
 
 const app = express()
-const redisClient = redis.createClient('redis://localhost:6379')
-
-redisClient.on('error', (err) => console.log('Redis Client Error', err))
 
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }))
@@ -32,22 +29,41 @@ app.get('/', (req, res) => {
   `)
 })
 
-app.post('/', async (req, res) => {
-  let number = req.body.number
-  await redisClient.connect()
+app.post('/', (req, res) => {
+  let number = req.body.number;
 
-  redisClient.exists(number, (error, isKeyExistInCache) => {
-    if (error) {
-      console.error(error)
-      return
-    }
+  const client = redis.createClient();
+  client.on('error', (err) => console.log('Redis Client Error', err));
 
-    if (isKeyExistInCache) {
-      getResultFromCache(number, res)
-    } else {
-      getResultFromAPI(number, res)
-    }
-  })
+  (async () => {
+    await client.connect();
+
+    await client.set('key', number);
+    const value = await client.get('key');
+
+    console.log(value)
+  })();
+
+  // const redisClient = redis.createClient()
+
+  // redisClient.on('error', err => {
+  //   console.log('Redis Client Error ' + err)
+  // })
+
+  // await redisClient.connect()
+
+  // redisClient.exists(number, (error, isKeyExistInCache) => {
+  //   if (error) {
+  //     console.error(error)
+  //     return
+  //   }
+
+  //   if (isKeyExistInCache) {
+  //     getResultFromCache(number, res)
+  //   } else {
+  //     getResultFromAPI(number, res)
+  //   }
+  // })
 })
 
 const getResultFromCache = (number, res) => {
