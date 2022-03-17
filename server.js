@@ -9,6 +9,9 @@ const app = express()
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }))
 
+const client = redis.createClient();
+client.on('error', (err) => console.log('Redis Client Error', err));
+
 app.get('/', (req, res) => {
   res.send(`
   <html lang="en">
@@ -32,9 +35,6 @@ app.get('/', (req, res) => {
 app.post('/', (req, res) => {
   let number = req.body.number;
 
-  const client = redis.createClient();
-  client.on('error', (err) => console.log('Redis Client Error', err));
-
   (async () => {
     await client.connect();
 
@@ -42,6 +42,8 @@ app.post('/', (req, res) => {
     const value = await client.get('key');
 
     console.log(value)
+
+    await client.quit()
   })();
 
   // const redisClient = redis.createClient()
