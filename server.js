@@ -57,6 +57,7 @@ app.post('/', async (req, res) => {
         client.expire(number, 60)
 
         res.redirect(`/done?result=${result}&from=API`)
+        await client.quit()
       })
   }
 
