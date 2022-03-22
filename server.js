@@ -32,44 +32,39 @@ app.get('/', (req, res) => {
   `)
 })
 
-app.post('/', (req, res) => {
+app.post('/', async (req, res) => {
   let number = req.body.number;
 
-  (async () => {
-    await client.connect();
+  await client.connect();
 
-    await client.set('key', number);
-    const value = await client.get('key');
+  const isKeyExistInCache = await client.exists(number);
 
-    console.log(value)
+  if (isKeyExistInCache) {
+    const result = await client.get(number)
 
-    await client.quit()
-  })();
+    res.redirect(`/done?result=${result}&from=cache`)
+  } else {
+    console.log('inside else')
+    axios.post('http://localhost:3000/', {
+      number: number
+    })
+      .then(async (response) => {
+        let result = response.data.result
 
-  // const redisClient = redis.createClient()
+        await client.connect();
 
-  // redisClient.on('error', err => {
-  //   console.log('Redis Client Error ' + err)
-  // })
+        client.set(number, result)
+        client.expire(number, 60)
 
-  // await redisClient.connect()
+        res.redirect(`/done?result=${result}&from=API`)
+      })
+  }
 
-  // redisClient.exists(number, (error, isKeyExistInCache) => {
-  //   if (error) {
-  //     console.error(error)
-  //     return
-  //   }
-
-  //   if (isKeyExistInCache) {
-  //     getResultFromCache(number, res)
-  //   } else {
-  //     getResultFromAPI(number, res)
-  //   }
-  // })
+  await client.quit()
 })
 
 const getResultFromCache = (number, res) => {
-  redisClient.get(number, (error, result) => {
+  client.get(number, (error, result) => {
     if (error) {
       console.error(error)
       return
@@ -90,8 +85,8 @@ const getResultFromAPI = (number, res) => {
   })
     .then(response => {
       let result = response.data.result
-      redisClient.set(number, result)
-      redisClient.expire(number, 60)
+      client.set(number, result)
+      client.expire(number, 60)
 
       res.redirect(`/done?result=${result}&from=API`)
     })
