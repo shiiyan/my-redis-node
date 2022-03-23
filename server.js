@@ -9,8 +9,8 @@ const app = express()
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: true }))
 
-const client = redis.createClient();
-client.on('error', (err) => console.log('Redis Client Error', err));
+const redisClient = redis.createClient();
+redisClient.on('error', (err) => console.log('Redis Client Error', err));
 
 app.get('/', (req, res) => {
   res.send(`
@@ -33,63 +33,37 @@ app.get('/', (req, res) => {
 })
 
 app.post('/', async (req, res) => {
-  let number = req.body.number;
-
-  await client.connect();
-
-  const isKeyExistInCache = await client.exists(number);
+  const number = req.body.number;
+  await redisClient.connect();
+  const isKeyExistInCache = await redisClient.exists(number);
 
   if (isKeyExistInCache) {
-    const result = await client.get(number)
-
-    res.redirect(`/done?result=${result}&from=cache`)
+    getResultFromCache(number, res);
   } else {
-    console.log('inside else')
-    axios.post('http://localhost:3000/', {
-      number: number
-    })
-      .then(async (response) => {
-        let result = response.data.result
-
-        await client.connect();
-
-        client.set(number, result)
-        client.expire(number, 60)
-
-        res.redirect(`/done?result=${result}&from=API`)
-        await client.quit()
-      })
+    getResultFromAPI(number, res);
   }
 
-  await client.quit()
+  await redisClient.quit()
 })
 
-const getResultFromCache = (number, res) => {
-  client.get(number, (error, result) => {
-    if (error) {
-      console.error(error)
-      return
-    }
-
-    if (!result) {
-      console.error('key is not exist in cache')
-      return
-    }
-
-    res.redirect(`/done?result=${result}&from=cache`)
-  })
+const getResultFromCache = async (number, res) => {
+  const result = await redisClient.get(number)
+  res.redirect(`/done?result=${result}&from=cache`)
 }
 
-const getResultFromAPI = (number, res) => {
+const getResultFromAPI = async (number, res) => {
   axios.post('http://localhost:3000/', {
     number: number
   })
-    .then(response => {
-      let result = response.data.result
-      client.set(number, result)
-      client.expire(number, 60)
+    .then(async (response) => {
+      const result = response.data.result
+      await redisClient.connect();
+
+      redisClient.set(number, result)
+      redisClient.expire(number, 60)
 
       res.redirect(`/done?result=${result}&from=API`)
+      await redisClient.quit()
     })
 }
 
