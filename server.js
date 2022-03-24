@@ -47,16 +47,20 @@ app.post('/', async (req, res) => {
 })
 
 const getResultFromCache = async (number, res) => {
+  const startTime = Date.now();
   const result = await redisClient.get(number)
+  console.log('Cache request took', Date.now() - startTime, 'Milliseconds')
   res.redirect(`/done?result=${result}&from=cache`)
 }
 
 const getResultFromAPI = async (number, res) => {
+  const startTime = Date.now();
   axios.post('http://localhost:3000/', {
     number: number
   })
     .then(async (response) => {
       const result = response.data.result
+      console.log('API request took', Date.now() - startTime, 'Milliseconds');
       await redisClient.connect();
 
       redisClient.set(number, result)
